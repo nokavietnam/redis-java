@@ -4,7 +4,7 @@ import com.hoclamdev.cleaner.ExpiryCleaner;
 import com.hoclamdev.config.ConfigLoader;
 import com.hoclamdev.handler.CommandHandler;
 import com.hoclamdev.handler.GetSetDelHandler;
-import com.hoclamdev.protocal.RESPParser;
+import com.hoclamdev.protocol.RESPParser;
 import com.hoclamdev.snapshot.AOFLogger;
 import com.hoclamdev.snapshot.RDBManager;
 import com.hoclamdev.store.DataStore;
@@ -28,21 +28,22 @@ public class RedisServer {
 
     public static void main(String[] args) {
         String mode = ConfigLoader.get("persistence.mode", "RDB").toUpperCase();
+        ScheduledExecutorService scheduler = null;
 
         if (mode.equals("RDB")) {
             RDBManager.loadSnapshot();
             int interval = ConfigLoader.getInt("rdb.snapshot.interval", 30);
 
-            try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory())) {
-                scheduler.scheduleAtFixedRate(() -> {
-                    try {
-                        RDBManager.saveSnapshot();
-                        log.info("RDB snapshot saved.");
-                    } catch (Exception e) {
-                        log.error("RDB save error: ", e);
-                    }
-                }, interval, interval, TimeUnit.SECONDS);
-            }
+            scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
+            scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    RDBManager.saveSnapshot();
+                    log.info("RDB snapshot saved.");
+                } catch (Exception e) {
+                    log.error("RDB save error: ", e);
+                }
+            }, interval, interval, TimeUnit.SECONDS);
+
 //            new Thread(() -> {
 //                while (true) {
 //                    try {
@@ -63,17 +64,19 @@ public class RedisServer {
 
         try (ServerSocket serverSocket = new ServerSocket(6379);) {
             log.info("Redis Java started on port 6379");
-
             // Start the TTL background cleaner thread
             ExpiryCleaner.start();
-
             // Accept and handle clients
             while (!Thread.currentThread().isInterrupted()) {
                 Socket client = serverSocket.accept();
-                new Thread(() -> handleClient(client)).start();
+                Thread.ofVirtual().start(() ->  handleClient(client));
             }
         } catch (Exception ex) {
             log.error("Server start error: ", ex);
+        } finally {
+            if (scheduler != null) {
+                scheduler.close();
+            }
         }
     }
 
