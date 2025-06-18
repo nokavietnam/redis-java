@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DataStore {
 
     private static volatile DataStore instance;
+    private static final Map<String, String> store = new ConcurrentHashMap<>();
+    private static final Map<String, Long> ttlMap = new ConcurrentHashMap<>();
 
     private DataStore() {}
 
@@ -21,9 +23,6 @@ public class DataStore {
         return instance;
     }
 
-    private static final Map<String, String> store = new ConcurrentHashMap<>();
-    private static final Map<String, Long> ttlMap = new ConcurrentHashMap<>();
-
     public static Map<String, Long> getTTLMap() {
         return ttlMap;
     }
@@ -32,9 +31,15 @@ public class DataStore {
         return new HashMap<>(store);
     }
 
-    public static synchronized void loadFromSnapshot(Map<String, String> snapshot) {
+    public static synchronized Map<String, Long> getTTLMapSnapshot() {
+        return new HashMap<>(ttlMap);
+    }
+
+    public static synchronized void loadSnapshot(Map<String, String> snapshot, Map<String, Long> ttlSnapshot) {
         store.clear();
+        ttlMap.clear();
         store.putAll(snapshot);
+        ttlMap.putAll(ttlSnapshot);
     }
 
     public static void set(String key, String value){
