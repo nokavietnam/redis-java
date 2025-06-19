@@ -31,10 +31,10 @@ public class ExpiryCleaner {
 
         Runnable task = () -> {
             long now = System.currentTimeMillis();
-            for (String key : new HashSet<>(DataStore.getTTLMap().keySet())) {
-                Long expireAt = DataStore.getTTLMap().get(key);
+            for (String key : new HashSet<>(DataStore.getInstance().getTTLMap().keySet())) {
+                Long expireAt = DataStore.getInstance().getTTLMap().get(key);
                 if (expireAt != null && expireAt < now) {
-                    DataStore.del(key);
+                    DataStore.getInstance().del(key);
                 }
             }
         };

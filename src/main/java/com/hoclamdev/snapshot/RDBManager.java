@@ -21,8 +21,8 @@ public class RDBManager {
 
     public static void saveSnapshot() throws IOException {
         SnapshotData snapshot = new SnapshotData(
-                DataStore.getSnapshot(),
-                DataStore.getTTLMapSnapshot()
+                DataStore.getInstance().getSnapshot(),
+                DataStore.getInstance().getTTLMapSnapshot()
         );
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(FILE))) {
             out.writeObject(snapshot);
@@ -36,7 +36,7 @@ public class RDBManager {
 
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             SnapshotData snapshot = (SnapshotData) in.readObject();
-            DataStore.loadSnapshot(snapshot.getStore(), snapshot.getTtlMap());
+            DataStore.getInstance().loadSnapshot(snapshot.getStore(), snapshot.getTtlMap());
         } catch (IOException | ClassNotFoundException e) {
             log.error("Failed to load RDB: ", e);
         }

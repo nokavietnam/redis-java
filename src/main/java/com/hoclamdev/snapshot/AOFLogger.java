@@ -27,6 +27,16 @@ public class AOFLogger {
         }
     }
 
+    public static synchronized void logCommand(String cmd) {
+        try (FileWriter fw = new FileWriter(FILE, true);
+             BufferedWriter bw = new BufferedWriter(fw)) {
+            bw.write(cmd);
+            bw.newLine();
+        } catch (IOException e) {
+            log.error("AOF write error: ", e);
+        }
+    }
+
     public static void replay(DataStore store) {
         File file = new File(FILE);
         if (!file.exists()) return;

@@ -4,7 +4,9 @@ import com.hoclamdev.job.ExpiryCleaner;
 import com.hoclamdev.encoder.RESPEncoder;
 import com.hoclamdev.handler.CommandRouter;
 import com.hoclamdev.job.SnapshotJob;
+import com.hoclamdev.protocol.RESP3Parser;
 import com.hoclamdev.protocol.RESPParser;
+import com.hoclamdev.protocol.data.RedisCommand;
 import com.hoclamdev.snapshot.SnapShot;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -14,6 +16,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -80,26 +83,27 @@ public class EventLoop {
             if (bytesRead  == -1) {
                 channel.close();
                 key.cancel();
-                log.warn("Client disconnected");
+                log.warn("Client disconnected {}", channel.getRemoteAddress());
                 return;
             }
             if (bytesRead == 0) return;
 
             buffer.flip();
-            byte[] raw = new byte[buffer.remaining()];
-            buffer.get(raw);
+            byte[] rawData = new byte[buffer.remaining()];
+            buffer.get(rawData);
             buffer.clear();
 
             // Parse đầu vào RESP
-            InputStream input = new ByteArrayInputStream(raw);
-            RESPParser parser = new RESPParser(input);
+            InputStream input = new ByteArrayInputStream(rawData);
+            RESP3Parser parser = new RESP3Parser(input);
 
             while (!Thread.currentThread().isInterrupted()) {
-                List<String> cmd;
+                RedisCommand cmd = null;
                 try {
                     cmd = parser.parseCommand(); // một lệnh RESP
-                    if (cmd == null || cmd.isEmpty())
+                    if (cmd == null)
                         break;
+
                 } catch (EOFException e) {
                     // dữ liệu chưa đầy đủ, đợi thêm trong lần sau
                     break;
@@ -109,20 +113,24 @@ public class EventLoop {
                     channel.write(ByteBuffer.wrap(errResp.getBytes(StandardCharsets.UTF_8)));
                     return;
                 }
-
                 // Xử lý command và encode kết quả RESP
                 String response = CommandRouter.processRESP(cmd);
                 ByteBuffer outBuffer = ByteBuffer.wrap(response.getBytes(StandardCharsets.UTF_8));
                 channel.write(outBuffer);
             }
-        } catch (IOException ex) {
+        } catch (SocketException se) {
             try {
+                log.error("Socket reset: {}", se.getMessage());
                 channel.close();
-            } catch (IOException ignored) {
-                log.error("close channel failed");
-            }
+            } catch (IOException ignored) {}
             key.cancel();
-            log.error("Client I/O error: ", ex);
+
+        } catch (IOException e) {
+            try {
+                log.error("Read error: {}", e.getMessage());
+                channel.close();
+            } catch (IOException ignored) {}
+            key.cancel();
         }
     }
 }

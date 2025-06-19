@@ -45,3 +45,12 @@ get x
 # delete key x
 del x
 ```
+
+## RESP3
+
+| RESP3                   | Supported |
+|-------------------------|-----------|
+| Simple, Bulk, Verbatim  | ✅         |
+| Integer, Double, BigInt | ✅         |
+| Null, Boolean           | ✅         |
+| Array, Map, Attributes  | ✅         |

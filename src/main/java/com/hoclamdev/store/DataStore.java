@@ -1,58 +1,71 @@
 package com.hoclamdev.store;
 
+import com.hoclamdev.config.ConfigLoader;
+
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DataStore {
+    private static final int MAX_KEYS = ConfigLoader.getInt("max.memory.keys", 1000);
 
-    private static volatile DataStore instance;
-    private static final Map<String, String> store = new ConcurrentHashMap<>();
+    // wrap LRUCache Collections.synchronizedMap to make thread safe
+    private static final Map<String, String> store = Collections.synchronizedMap(
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                    boolean shouldRemove = size() > MAX_KEYS;
+                    if (shouldRemove) {
+                        ttlMap.remove(eldest.getKey()); // xóa TTL nếu bị đẩy ra bởi LRU
+                    }
+                    return shouldRemove;
+                }
+            }
+    );
     private static final Map<String, Long> ttlMap = new ConcurrentHashMap<>();
 
     private DataStore() {}
 
-    public static DataStore getInstance() {
-        if (instance == null) {
-            synchronized (DataStore.class) {
-                if (instance == null) {
-                    instance = new DataStore();
-                }
-            }
-        }
-        return instance;
+    private static class Holder {
+        private static final DataStore INSTANCE = new DataStore();
     }
 
-    public static Map<String, Long> getTTLMap() {
+    public static DataStore getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    public Map<String, Long> getTTLMap() {
         return ttlMap;
     }
 
-    public static synchronized Map<String, String> getSnapshot() {
+    public synchronized Map<String, String> getSnapshot() {
         return new HashMap<>(store);
     }
 
-    public static synchronized Map<String, Long> getTTLMapSnapshot() {
+    public synchronized Map<String, Long> getTTLMapSnapshot() {
         return new HashMap<>(ttlMap);
     }
 
-    public static synchronized void loadSnapshot(Map<String, String> snapshot, Map<String, Long> ttlSnapshot) {
+    public synchronized void loadSnapshot(Map<String, String> snapshot, Map<String, Long> ttlSnapshot) {
         store.clear();
         ttlMap.clear();
         store.putAll(snapshot);
         ttlMap.putAll(ttlSnapshot);
     }
 
-    public static void set(String key, String value){
+    public void set(String key, String value) {
         store.put(key, value);
         ttlMap.remove(key);
     }
 
-    public static void setWithTTL(String key, String value, int ttlSeconds) {
+    public void setWithTTL(String key, String value, int ttlSeconds) {
         store.put(key, value);
         ttlMap.put(key, System.currentTimeMillis() + ttlSeconds * 1000L);
     }
 
-    public static String get(String key) {
+    public String get(String key) {
         Long expireAt = ttlMap.get(key);
         if (expireAt != null && expireAt < System.currentTimeMillis()) {
             store.remove(key);
@@ -62,8 +75,37 @@ public class DataStore {
         return store.get(key);
     }
 
-    public static boolean del(String key) {
+    public boolean del(String key) {
         ttlMap.remove(key);
         return store.remove(key) != null;
+    }
+
+    // EXPIRE: đặt TTL cho key
+    public static boolean expire(String key, int seconds) {
+        if (!store.containsKey(key)) return false;
+        ttlMap.put(key, System.currentTimeMillis() + seconds * 1000L);
+        return true;
+    }
+
+    // TTL: trả số giây còn lại, hoặc -2 nếu không tồn tại, -1 nếu không có TTL
+    public static long ttl(String key) {
+        if (!store.containsKey(key)) return -2;
+        Long expireAt = ttlMap.get(key);
+        if (expireAt == null) return -1;
+        long ttlMillis = expireAt - System.currentTimeMillis();
+        return ttlMillis > 0 ? ttlMillis / 1000 : -2;
+    }
+
+
+    public static Map<String, String> getInfo() {
+        Map<String, String> info = new LinkedHashMap<>();
+        info.put("redis_version", "1.0.0");
+        info.put("tcp_port", "6379");
+        info.put("process_id", String.valueOf(ProcessHandle.current().pid()));
+        info.put("keys", String.valueOf(store.size()));
+        info.put("ttl_keys", String.valueOf(ttlMap.size()));
+        info.put("max_keys", String.valueOf(MAX_KEYS));
+        info.put("memory_used", "n/a"); // có thể thêm sau
+        return info;
     }
 }
