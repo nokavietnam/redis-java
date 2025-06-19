@@ -29,14 +29,14 @@ public class RDBManager {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    //@SuppressWarnings("unchecked")
     public static void loadSnapshot() {
         File file = new File(FILE);
         if (!file.exists()) return;
 
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             SnapshotData snapshot = (SnapshotData) in.readObject();
-            DataStore.getInstance().loadSnapshot(snapshot.getStore(), snapshot.getTtlMap());
+            DataStore.getInstance().loadSnapshot(snapshot.store(), snapshot.ttlMap());
         } catch (IOException | ClassNotFoundException e) {
             log.error("Failed to load RDB: ", e);
         }

@@ -1,7 +1,10 @@
 package com.hoclamdev.store;
 
 import com.hoclamdev.config.ConfigLoader;
+import com.hoclamdev.os.MemoryMonitor;
+import com.sun.management.OperatingSystemMXBean;
 
+import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -10,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class DataStore {
     private static final int MAX_KEYS = ConfigLoader.getInt("max.memory.keys", 1000);
+    private static final long maxMemoryLimit = ConfigLoader.getInt("max.memory.size", 1024) * 1024L * 1024L;
 
     // wrap LRUCache Collections.synchronizedMap to make thread safe
     private static final Map<String, String> store = Collections.synchronizedMap(
@@ -17,7 +21,7 @@ public class DataStore {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
                     boolean shouldRemove = size() > MAX_KEYS;
-                    if (shouldRemove) {
+                    if (shouldRemove || MemoryMonitor.isMemoryExceeded(maxMemoryLimit)) {
                         ttlMap.remove(eldest.getKey()); // xóa TTL nếu bị đẩy ra bởi LRU
                     }
                     return shouldRemove;
@@ -98,14 +102,56 @@ public class DataStore {
 
 
     public static Map<String, String> getInfo() {
+        OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        int port = ConfigLoader.getInt("server.port", 6379);
         Map<String, String> info = new LinkedHashMap<>();
-        info.put("redis_version", "1.0.0");
-        info.put("tcp_port", "6379");
+        info.put("redis_version", ConfigLoader.get("version", "1.0.0"));
+        info.put("tcp_port", String.valueOf(port));
         info.put("process_id", String.valueOf(ProcessHandle.current().pid()));
         info.put("keys", String.valueOf(store.size()));
         info.put("ttl_keys", String.valueOf(ttlMap.size()));
         info.put("max_keys", String.valueOf(MAX_KEYS));
-        info.put("memory_used", "n/a"); // có thể thêm sau
+
+        long total = osBean.getTotalMemorySize();
+        long free = osBean.getFreeMemorySize();
+//        long used = total - free;
+//        info.put("used_memory", String.valueOf(used));
+//        info.put("used_memory_human", formatBytes(used));
+        info.put("total_system_memory", MemoryMonitor.formatBytes(total));
+        info.put("total_system_memory_human", MemoryMonitor.formatBytes(total));
+
+        long used = MemoryMonitor.getUsedMemory();
+        long max = MemoryMonitor.getMaxJvmMemory();
+        info.put("used_memory", MemoryMonitor.formatBytes(used));
+        info.put("used_memory_human", MemoryMonitor.formatBytes(used));
+        info.put("max_memory", MemoryMonitor.formatBytes(maxMemoryLimit));
+        info.put("max_memory_human", MemoryMonitor.formatBytes(maxMemoryLimit));
+        info.put("memory_exceeded", String.valueOf(used >= maxMemoryLimit));
+        info.put("max_jvm_memory", MemoryMonitor.formatBytes(max));
         return info;
+    }
+
+    public static Map<String, String> getMemoryInfo() {
+        OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+
+        long total = osBean.getTotalMemorySize();
+        long free = osBean.getFreeMemorySize();
+        long used = total - free;
+
+        Map<String, String> mem = new LinkedHashMap<>();
+        mem.put("used_memory", String.valueOf(used));
+        mem.put("used_memory_human", formatBytes(used));
+        mem.put("total_system_memory", String.valueOf(total));
+        mem.put("total_system_memory_human", formatBytes(total));
+        return mem;
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024)
+            return bytes + "B";
+        int unit = 1024;
+        int exp = (int) (Math.log(bytes) / Math.log(unit));
+        String pre = "KMGTPE".charAt(exp - 1) + "i";
+        return String.format("%.1f%sb", bytes / Math.pow(unit, exp), pre);
     }
 }

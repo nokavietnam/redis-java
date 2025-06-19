@@ -6,7 +6,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class SnapShot {
-
     private static final Logger log = LogManager.getLogger(SnapShot.class);
     public static void restore() {
         String mode = ConfigLoader.get("persistence.mode", "RDB").toUpperCase();

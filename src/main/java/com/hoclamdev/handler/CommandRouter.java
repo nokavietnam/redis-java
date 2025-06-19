@@ -17,16 +17,17 @@ public class CommandRouter {
 
     private static final Logger log = LogManager.getLogger(CommandRouter.class);
 
-    private CommandRouter() {}
+    private CommandRouter() {
+    }
 
     public static String processRESP(RedisCommand command) {
         if (command == null) {
             return RESPEncoder.error("Empty command");
         }
 
-        log.info("=========> " + command.getCommand() + " : " + command.getArgs());
+        log.info("=========> {} : {}", command.command(), command.args());
 
-        String commandType = command.getCommand().toUpperCase();
+        String commandType = command.command().toUpperCase();
         SnapshotType mode = SnapshotType.fromString(ConfigLoader.get("persistence.mode", "RDB").toUpperCase());
         return switch (commandType) {
             case "PING" -> handlePing(command);
@@ -47,24 +48,24 @@ public class CommandRouter {
     }
 
     private static String handlePing(RedisCommand command) {
-        String msg = !command.getArgs().isEmpty() ? command.getArgs().get(0) : "PONG";
+        String msg = !command.args().isEmpty() ? command.args().get(0) : "PONG";
         return RESPEncoder.verbatim("txt", msg);
     }
 
     private static String handleSet(RedisCommand command, SnapshotType mode) {
-        if (command.getArgs().size() < 2) {
+        if (command.args().size() < 2) {
             return RESPEncoder.error("ERR wrong number of arguments for 'SET'");
         }
         if (SnapshotType.AOF.equals(mode)) {
             AOFLogger.logCommand(command.toCommandString());
         }
-        if (command.getArgs().size() == 2) {
-            DataStore.getInstance().set(command.getArgs().get(0), command.getArgs().get(1));
+        if (command.args().size() == 2) {
+            DataStore.getInstance().set(command.args().get(0), command.args().get(1));
             return RESPEncoder.simple("OK");
-        } else if (command.getArgs().size() == 4 && command.getArgs().get(2).equalsIgnoreCase("EX")) {
+        } else if (command.args().size() == 4 && command.args().get(2).equalsIgnoreCase("EX")) {
             try {
-                int ttl = Integer.parseInt(command.getArgs().get(3));
-                DataStore.getInstance().setWithTTL(command.getArgs().get(0), command.getArgs().get(1), ttl);
+                int ttl = Integer.parseInt(command.args().get(3));
+                DataStore.getInstance().setWithTTL(command.args().get(0), command.args().get(1), ttl);
                 return RESPEncoder.simple("OK");
             } catch (NumberFormatException e) {
                 return RESPEncoder.error("-ERR invalid TTL");
@@ -75,23 +76,23 @@ public class CommandRouter {
     }
 
     private static String handleGet(RedisCommand command) {
-        if (command.getArgs().size() != 1) {
+        if (command.args().size() != 1) {
             return RESPEncoder.error("ERR wrong number of arguments for 'GET'");
         }
-        String val = DataStore.getInstance().get(command.getArgs().get(0));
+        String val = DataStore.getInstance().get(command.args().get(0));
         return val == null ? RESPEncoder.nullString() : RESPEncoder.bulk(val);
     }
 
     private static String handleDel(RedisCommand command, SnapshotType mode) {
-        if (command.getArgs().isEmpty()) {
+        if (command.args().isEmpty()) {
             return RESPEncoder.error("ERR wrong number of arguments for 'DEL'");
         }
         if (SnapshotType.AOF.equals(mode)) {
             AOFLogger.logCommand(command.toCommandString());
         }
         int count = 0;
-        for (int i = 0; i < command.getArgs().size(); i++) {
-            if (DataStore.getInstance().del(command.getArgs().get(i))) {
+        for (int i = 0; i < command.args().size(); i++) {
+            if (DataStore.getInstance().del(command.args().get(i))) {
                 count++;
             }
         }
@@ -99,20 +100,20 @@ public class CommandRouter {
     }
 
     private static String handleExpire(RedisCommand command) {
-        if (command.getArgs().size() != 2) {
+        if (command.args().size() != 2) {
             return RESPEncoder.error("ERR wrong number of arguments for 'EXPIRE'");
         }
-        String key = command.getArgs().get(0);
-        int ttl = Integer.parseInt(command.getArgs().get(1));
+        String key = command.args().get(0);
+        int ttl = Integer.parseInt(command.args().get(1));
         boolean ok = DataStore.expire(key, ttl);
         return RESPEncoder.bool(ok);
     }
 
     private static String handleTTL(RedisCommand command) {
-        if (command.getArgs().size() != 1) {
+        if (command.args().size() != 1) {
             return RESPEncoder.error("ERR wrong number of arguments for 'TTL'");
         }
-        String key = command.getArgs().get(0);
+        String key = command.args().get(0);
         long ttl = DataStore.ttl(key);
         return ttl >= 0 ? RESPEncoder.integer(ttl) : RESPEncoder.nullString();
     }

@@ -1,20 +1,16 @@
 package com.hoclamdev.eventloop;
 
-import com.hoclamdev.job.ExpiryCleaner;
 import com.hoclamdev.encoder.RESPEncoder;
 import com.hoclamdev.handler.CommandRouter;
+import com.hoclamdev.job.ExpiryCleaner;
 import com.hoclamdev.job.SnapshotJob;
 import com.hoclamdev.protocol.RESP3Parser;
-import com.hoclamdev.protocol.RESPParser;
 import com.hoclamdev.protocol.data.RedisCommand;
 import com.hoclamdev.snapshot.SnapShot;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.ByteArrayInputStream;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -24,13 +20,13 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 
-public class EventLoop {
+public class EventLoop implements Closeable {
     private static final Logger log = LogManager.getLogger(EventLoop.class);
     private Selector selector;
     private ServerSocketChannel serverChannel;
+    private SocketChannel clientChannel;
 
     public void start(int port) throws IOException {
         selector = Selector.open();
@@ -68,7 +64,7 @@ public class EventLoop {
     }
 
     private void handleAccept() throws IOException {
-        SocketChannel clientChannel = serverChannel.accept();
+        clientChannel = serverChannel.accept();
         clientChannel.configureBlocking(false);
         clientChannel.register(selector, SelectionKey.OP_READ, ByteBuffer.allocate(4096));
         log.info("New client connected: {}", clientChannel.getRemoteAddress());
@@ -132,5 +128,20 @@ public class EventLoop {
             } catch (IOException ignored) {}
             key.cancel();
         }
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (clientChannel != null) {
+            clientChannel.close();
+        }
+        if (serverChannel != null) {
+            serverChannel.close();
+        }
+        if (selector != null) {
+            selector.close();
+        }
+        SnapshotJob.getInstance().stop();
+        ExpiryCleaner.getInstance().stop();
     }
 }
