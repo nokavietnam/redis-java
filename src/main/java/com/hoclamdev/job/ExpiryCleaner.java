@@ -1,4 +1,4 @@
-package com.hoclamdev.cleaner;
+package com.hoclamdev.job;
 
 import com.hoclamdev.config.ConfigLoader;
 import com.hoclamdev.store.DataStore;
@@ -11,18 +11,22 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class ExpiryCleaner {
-
-    private static final ScheduledExecutorService scheduler =
-            Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
-
     private static final Logger log = LogManager.getLogger(ExpiryCleaner.class);
+    private final ScheduledExecutorService scheduler;
 
-//    public ExpiryCleaner() {
-//        setDaemon(true);
-//        this.intervalMs = ConfigLoader.getInt("ttl.clean.interval", 1000);
-//    }
+    private static class Holder {
+        private static final ExpiryCleaner INSTANCE = new ExpiryCleaner();
+    }
 
-    public static void start() {
+    private ExpiryCleaner() {
+        scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
+    }
+
+    public static ExpiryCleaner getInstance() {
+        return Holder.INSTANCE;
+    }
+
+    public void start() {
         int interval = ConfigLoader.getInt("ttl.clean.interval", 1000); // milliseconds
 
         Runnable task = () -> {
@@ -36,5 +40,11 @@ public class ExpiryCleaner {
         };
 
         scheduler.scheduleAtFixedRate(task, 0, interval, TimeUnit.MILLISECONDS);
+    }
+
+    public void stop() {
+        if (scheduler != null) {
+            scheduler.close();
+        }
     }
 }
