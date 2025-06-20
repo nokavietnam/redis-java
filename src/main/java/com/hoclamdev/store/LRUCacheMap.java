@@ -8,9 +8,9 @@ import java.util.Map;
 public class LRUCacheMap<K, V> extends LinkedHashMap<K, V> {
 
     private final int maxSize;
-    private final int maxMem;
+    private final long maxMem;
 
-    public LRUCacheMap(int maxSize, int maxMem) {
+    public LRUCacheMap(int maxSize, long maxMem) {
         super(maxSize, 0.75f, true);
         this.maxSize = maxSize;
         this.maxMem = maxMem;
