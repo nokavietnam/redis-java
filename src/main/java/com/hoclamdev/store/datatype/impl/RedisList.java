@@ -9,6 +9,10 @@ import java.util.List;
 public class RedisList extends RedisDataType {
     private final List<String> list = Collections.synchronizedList(new ArrayList<>());
 
+    public RedisList(long tll) {
+        super(tll);
+    }
+
     @Override
     public String type() {
         return "list";

@@ -13,6 +13,10 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class RedisZSet extends RedisDataType {
     private final NavigableMap<Double, Set<String>> scoreMap = new ConcurrentSkipListMap<>();
 
+    public RedisZSet(long tll) {
+        super(tll);
+    }
+
     @Override
     public String type() { return "zset"; }
 

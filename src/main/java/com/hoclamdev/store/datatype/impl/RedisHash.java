@@ -7,6 +7,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class RedisHash extends RedisDataType {
     private final Map<String, String> map = new ConcurrentHashMap<>();
+
+    public RedisHash(long tll) {
+        super(tll);
+    }
+
     @Override
     public String type() {
         return "hash";
