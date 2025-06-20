@@ -36,7 +36,7 @@ public class RDBManager {
 
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             SnapshotData snapshot = (SnapshotData) in.readObject();
-            DataStore.getInstance().loadSnapshot(snapshot.store(), snapshot.ttlMap());
+            DataStore.getInstance().loadSnapshot(snapshot.getStore(), snapshot.getTtlMap());
         } catch (IOException | ClassNotFoundException e) {
             log.error("Failed to load RDB: ", e);
         }

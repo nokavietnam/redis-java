@@ -5,12 +5,14 @@ import java.util.List;
 public record RedisCommand(String command, List<String> args) {
 
     public String toCommandString() {
-        StringBuilder sb = new StringBuilder(" ");
+        StringBuilder sb = new StringBuilder();
         sb.append(command);
+        sb.append(" ");
         for (String arg : args) {
             sb.append(arg);
+            sb.append(" ");
         }
-        return sb.toString();
+        return sb.toString().trim();
     }
 
     @Override

@@ -110,7 +110,7 @@ public class EventLoop implements Closeable {
                     return;
                 }
                 // Xử lý command và encode kết quả RESP
-                String response = CommandRouter.processRESP(cmd);
+                String response = CommandRouter.getInstance().processRESP(cmd);
                 ByteBuffer outBuffer = ByteBuffer.wrap(response.getBytes(StandardCharsets.UTF_8));
                 channel.write(outBuffer);
             }

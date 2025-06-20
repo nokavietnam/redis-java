@@ -1,5 +1,6 @@
 package com.hoclamdev.snapshot;
 
+import com.hoclamdev.common.CommandType;
 import com.hoclamdev.store.DataStore;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,11 +45,34 @@ public class AOFLogger {
             String line;
             while ((line = reader.readLine()) != null) {
                 List<String> parts = List.of(line.split(" "));
-                if (parts.get(0).equalsIgnoreCase("SET") && parts.size() == 3) {
-                    store.set(parts.get(1), parts.get(2));
-                } else if (parts.get(0).equalsIgnoreCase("DEL") && parts.size() == 2) {
-                    store.del(parts.get(1));
+                switch (CommandType.fromString(parts.get(0))) {
+                    case SET: {
+                        if (parts.size() == 3) {
+                            store.set(parts.get(1), parts.get(2));
+                        }
+                        break;
+                    }
+                    case DEL: {
+                        if (parts.size() == 2) {
+                            store.del(parts.get(1));
+                        }
+                        break;
+                    }
+                    case RPUSH: {
+                        if (parts.size() == 3) {
+                            store.rpush(parts.get(1), parts.get(2));
+                        }
+                        break;
+                    }
+                    default:
+                        break;
                 }
+
+//                if (parts.get(0).equalsIgnoreCase("SET") && parts.size() == 3) {
+//                    store.set(parts.get(1), parts.get(2));
+//                } else if (parts.get(0).equalsIgnoreCase("DEL") && parts.size() == 2) {
+//                    store.del(parts.get(1));
+//                }
             }
         } catch (IOException e) {
             log.error("AOF replay error: ", e);
