@@ -6,6 +6,12 @@ public class RedisString extends RedisDataType {
     private final String value;
 
     public RedisString(String value) {
+        super(-1L);
+        this.value = value;
+    }
+
+    public RedisString(String value, long tll) {
+        super(tll);
         this.value = value;
     }
     @Override

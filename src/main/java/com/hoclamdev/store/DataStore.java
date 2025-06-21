@@ -16,26 +16,14 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class DataStore {
     private static final int MAX_KEYS = ConfigLoader.getInt("max.memory.keys", 1000);
     private static final long MAX_MEMORY_LIMIT = ConfigLoader.getInt("max.memory.size", 1024) * 1024L * 1024L;
 
     // wrap LRUCache Collections.synchronizedMap to make thread safe
-    private static final Map<String, RedisDataType> store = Collections.synchronizedMap(
-            new LinkedHashMap<>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, RedisDataType> eldest) {
-                    boolean shouldRemove = size() > MAX_KEYS;
-                    if (shouldRemove || MemoryMonitor.isMemoryExceeded(MAX_MEMORY_LIMIT)) {
-                        ttlMap.remove(eldest.getKey()); // xóa TTL nếu bị đẩy ra bởi LRU
-                    }
-                    return shouldRemove;
-                }
-            }
-    );
-    private static final Map<String, Long> ttlMap = new ConcurrentHashMap<>();
+    private static final Map<String, RedisDataType> store = Collections.synchronizedMap(new LRUCacheMap<>(MAX_KEYS, MAX_MEMORY_LIMIT));
+
 
     private DataStore() {}
 
@@ -47,39 +35,22 @@ public class DataStore {
         return Holder.INSTANCE;
     }
 
-    public Map<String, Long> getTTLMap() {
-        return ttlMap;
-    }
-
     public synchronized Map<String, RedisDataType> getSnapshot() {
         return new HashMap<>(store);
     }
 
-    public synchronized Map<String, Long> getTTLMapSnapshot() {
-        return new HashMap<>(ttlMap);
-    }
-
-    public synchronized void loadSnapshot(Map<String, RedisDataType> snapshot, Map<String, Long> ttlSnapshot) {
+    public synchronized void loadSnapshot(Map<String, RedisDataType> snapshot) {
         store.clear();
-        ttlMap.clear();
         store.putAll(snapshot);
-        ttlMap.putAll(ttlSnapshot);
     }
 
     public void set(String key, String value) {
         store.put(key, new RedisString(value));
-        ttlMap.remove(key);
     }
 
     public void setEx(String key, String value, int ttlSeconds) {
-        store.put(key, new RedisString(value));
-        ttlMap.put(key, System.currentTimeMillis() + ttlSeconds * 1000L);
+        store.put(key, new RedisString(value, ttlSeconds));
     }
-
-//    public void setWithTTL(String key, String value, int ttlSeconds) {
-//        store.put(key, new RedisString(value));
-//        ttlMap.put(key, System.currentTimeMillis() + ttlSeconds * 1000L);
-//    }
 
     public String get(String key) {
         if (isExpired(key)) return null;
@@ -90,7 +61,7 @@ public class DataStore {
     public int rpush(String key, String value) {
         if (isExpired(key)) return 0;
         RedisList list = (store.containsKey(key) && store.get(key) instanceof RedisList redisList) ?
-                redisList : new RedisList();
+                redisList : new RedisList(-1);
         list.rpush(value);
         store.put(key, list);
         return list.size();
@@ -105,7 +76,7 @@ public class DataStore {
     public void sadd(String key, String value) {
         if (isExpired(key)) return;
         RedisSet set = (store.containsKey(key) && store.get(key) instanceof RedisSet redisSet) ?
-                redisSet : new RedisSet();
+                redisSet : new RedisSet(-1);
         set.sadd(value);
         store.put(key, set);
     }
@@ -119,7 +90,7 @@ public class DataStore {
     public void hset(String key, String field, String value) {
         if (isExpired(key)) return;
         RedisHash hash = (store.containsKey(key) && store.get(key) instanceof RedisHash redisHash) ?
-                redisHash : new RedisHash();
+                redisHash : new RedisHash(-1);
         hash.hset(field, value);
         store.put(key, hash);
     }
@@ -139,7 +110,7 @@ public class DataStore {
     public void zadd(String key, double score, String member) {
         if (isExpired(key)) return;
         RedisZSet zset = (store.containsKey(key) && store.get(key) instanceof RedisZSet redisZSet) ?
-                redisZSet : new RedisZSet();
+                redisZSet : new RedisZSet(-1);
         zset.zadd(score, member);
         store.put(key, zset);
     }
@@ -158,30 +129,28 @@ public class DataStore {
 
 
     public boolean del(String key) {
-        ttlMap.remove(key);
         return store.remove(key) != null;
     }
 
     // EXPIRE: đặt TTL cho key
     public boolean expire(String key, int seconds) {
         if (!store.containsKey(key)) return false;
-        ttlMap.put(key, System.currentTimeMillis() + seconds * 1000L);
+        store.get(key).setTll(System.currentTimeMillis() + seconds * 1000L);
         return true;
     }
 
     // TTL: trả số giây còn lại, hoặc -2 nếu không tồn tại, -1 nếu không có TTL
     public long ttl(String key) {
-        Long exp = ttlMap.get(key);
+        RedisDataType exp = store.get(key);
         if (exp == null) return -1;
-        long ttl = (exp - System.currentTimeMillis()) / 1000;
+        long ttl = (exp.getTll() - System.currentTimeMillis()) / 1000;
         return ttl >= 0 ? ttl : -1;
     }
 
     private boolean isExpired(String key) {
-        Long exp = ttlMap.get(key);
-        if (exp != null && System.currentTimeMillis() > exp) {
+        RedisDataType exp = store.get(key);
+        if (exp != null && exp.getTll() > 0 && System.currentTimeMillis() > exp.getTll()) {
             store.remove(key);
-            ttlMap.remove(key);
             return true;
         }
         return false;
@@ -195,7 +164,6 @@ public class DataStore {
         info.put("tcp_port", String.valueOf(port));
         info.put("process_id", String.valueOf(ProcessHandle.current().pid()));
         info.put("keys", String.valueOf(store.size()));
-        info.put("ttl_keys", String.valueOf(ttlMap.size()));
         info.put("max_keys", String.valueOf(MAX_KEYS));
 
         long total = osBean.getTotalMemorySize();
@@ -217,36 +185,9 @@ public class DataStore {
         return info;
     }
 
-    public Map<String, String> getMemoryInfo() {
-        OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-
-        long total = osBean.getTotalMemorySize();
-        long free = osBean.getFreeMemorySize();
-        long used = total - free;
-
-        Map<String, String> mem = new LinkedHashMap<>();
-        mem.put("used_memory", String.valueOf(used));
-        mem.put("used_memory_human", formatBytes(used));
-        mem.put("total_system_memory", String.valueOf(total));
-        mem.put("total_system_memory_human", formatBytes(total));
-        return mem;
-    }
-
-    private String formatBytes(long bytes) {
-        if (bytes < 1024)
-            return bytes + "B";
-        int unit = 1024;
-        int exp = (int) (Math.log(bytes) / Math.log(unit));
-        String pre = "KMGTPE".charAt(exp - 1) + "i";
-        return String.format("%.1f%sb", bytes / Math.pow(unit, exp), pre);
-    }
-
     public void cleanExpiredKeys() {
-        long now = System.currentTimeMillis();
-        for (Map.Entry<String, Long> entry : ttlMap.entrySet()) {
-            if (entry.getValue() < now) {
-                del(entry.getKey());
-            }
+        for (Map.Entry<String, RedisDataType> entry : store.entrySet()) {
+            isExpired(entry.getKey());
         }
     }
 }

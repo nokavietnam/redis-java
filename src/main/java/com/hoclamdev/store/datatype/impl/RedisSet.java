@@ -7,6 +7,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class RedisSet extends RedisDataType {
     private final Set<String> set = ConcurrentHashMap.newKeySet();
+
+    public RedisSet(long tll) {
+        super(tll);
+    }
+
     @Override
     public String type() {
         return "set";
