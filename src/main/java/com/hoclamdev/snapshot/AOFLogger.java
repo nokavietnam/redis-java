@@ -44,38 +44,44 @@ public class AOFLogger {
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                List<String> parts = List.of(line.split(" "));
-                switch (CommandType.fromString(parts.get(0))) {
+                List<String> command = List.of(line.split(" "));
+                switch (CommandType.fromString(command.getFirst())) {
                     case SET: {
-                        if (parts.size() == 3) {
-                            store.set(parts.get(1), parts.get(2));
-                        }
+                        replaySet(store, command);
                         break;
                     }
                     case DEL: {
-                        if (parts.size() == 2) {
-                            store.del(parts.get(1));
-                        }
+                        replayDel(store, command);
                         break;
                     }
                     case RPUSH: {
-                        if (parts.size() == 3) {
-                            store.rpush(parts.get(1), parts.get(2));
-                        }
+                        replayRPush(store, command);
                         break;
                     }
                     default:
                         break;
                 }
-
-//                if (parts.get(0).equalsIgnoreCase("SET") && parts.size() == 3) {
-//                    store.set(parts.get(1), parts.get(2));
-//                } else if (parts.get(0).equalsIgnoreCase("DEL") && parts.size() == 2) {
-//                    store.del(parts.get(1));
-//                }
             }
         } catch (IOException e) {
             log.error("AOF replay error: ", e);
+        }
+    }
+
+    private static void replaySet(DataStore store, List<String> command) {
+        if (command.size() == 3) {
+            store.set(command.get(1), command.get(2));
+        }
+    }
+
+    private static void replayDel(DataStore store, List<String> command) {
+        if (command.size() == 2) {
+            store.del(command.get(1));
+        }
+    }
+
+    private static void replayRPush(DataStore store, List<String> command) {
+        if (command.size() == 3) {
+            store.rpush(command.get(1), command.get(2));
         }
     }
 }

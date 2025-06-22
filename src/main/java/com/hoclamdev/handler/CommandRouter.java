@@ -1,6 +1,5 @@
 package com.hoclamdev.handler;
 
-import com.hoclamdev.command.CommandRegistry;
 import com.hoclamdev.common.CommandType;
 import com.hoclamdev.common.SnapshotType;
 import com.hoclamdev.config.ConfigLoader;
@@ -11,8 +10,7 @@ import com.hoclamdev.store.DataStore;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class CommandRouter {
 
@@ -40,6 +38,7 @@ public class CommandRouter {
         SnapshotType mode = SnapshotType.fromString(ConfigLoader.get("persistence.mode", "RDB").toUpperCase());
         return switch (CommandType.fromString(commandType)) {
             case PING -> handlePing(command);
+            case HELLO -> handleHello(command);
             case SET -> handleSet(command, mode);
             case GET -> handleGet(command);
             case DEL -> handleDel(command, mode);
@@ -71,9 +70,76 @@ public class CommandRouter {
 //            case "ZREM":
 //                return DataStore.zrem(args[1], args[2]) ? 1 : 0;
 
-//            case "COMMAND" -> handleCommand();
+//            case COMMAND -> handleCommand();
             default -> RESPEncoder.error("ERR unknown command");
         };
+    }
+
+    private String handleCommand() {
+        Map<String, Object> commandMap = new LinkedHashMap<>();
+
+        Map<String, Object> setCommand = new LinkedHashMap<>();
+        setCommand.put("arity", 3);
+        setCommand.put("flags", List.of("write", "denyoom"));
+        setCommand.put("first-key", 1);
+        setCommand.put("last-key", 1);
+        setCommand.put("step", 1);
+        setCommand.put("acl-categories", List.of("@write", "@keyspace"));
+        setCommand.put("tips", List.of());
+
+        Map<String, Object> keySpec = new LinkedHashMap<>();
+        keySpec.put("flags", List.of("write"));
+
+// begin-search
+        Map<String, Object> beginSearch = new LinkedHashMap<>();
+        beginSearch.put("type", "index");
+        keySpec.put("begin-search", beginSearch);
+
+// spec
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("index", 1);
+        spec.put("flags", List.of());
+        keySpec.put("spec", spec);
+
+// find-key
+        Map<String, Object> findKey = new LinkedHashMap<>();
+        findKey.put("type", "range");
+
+        Map<String, Object> rangeSpec = new LinkedHashMap<>();
+        rangeSpec.put("start", 1);
+        rangeSpec.put("end", 1);
+        rangeSpec.put("flags", List.of());
+
+        findKey.put("range-spec", rangeSpec);
+        keySpec.put("find-key", findKey);
+
+        setCommand.put("key-specs", List.of(keySpec));
+        setCommand.put("subcommands", List.of());
+        setCommand.put("engine", null);
+
+        commandMap.put("set", setCommand);
+
+        return RESPEncoder.mapToRESP3(commandMap);
+    }
+
+    private String handleHello(RedisCommand command) {
+        if (command.args().size() >= 3 && command.args().get(1).equals("AUTH")) {
+            String username = command.args().get(2);
+            String password = command.args().get(3);
+            log.info("Authenticating user '{}' with password '{}'", username, password);
+            // TODO: implement auth
+        }
+
+        Map<String, Object> helloMap = new LinkedHashMap<>();
+        helloMap.put("server", "redis");
+        helloMap.put("version", "6.0.0");
+        helloMap.put("proto", 3);
+        helloMap.put("id", 10);
+        helloMap.put("mode", "standalone");
+        helloMap.put("role", "master");
+        helloMap.put("modules", Collections.emptyList());
+
+        return RESPEncoder.mapToRESP3(helloMap);
     }
 
     private String handleHSet(RedisCommand command, SnapshotType mode) {
@@ -130,14 +196,10 @@ public class CommandRouter {
         return RESPEncoder.integer(size);
     }
 
-    private String handleCommand() {
-        List<List<Object>> allCommands = CommandRegistry.toRESP3ArrayList();
-        return RESPEncoder.arrayOfArrays(allCommands);
-    }
-
     private String handlePing(RedisCommand command) {
-        String msg = !command.args().isEmpty() ? command.args().get(0) : "PONG";
-        return RESPEncoder.verbatim("txt", msg);
+        String msg = !command.args().isEmpty() ? command.args().getFirst() : "PONG";
+        //return RESPEncoder.verbatim("txt", msg);
+        return RESPEncoder.simple(msg);
     }
 
     private String handleSet(RedisCommand command, SnapshotType mode) {
@@ -201,7 +263,7 @@ public class CommandRouter {
         if (command.args().size() != 1) {
             return RESPEncoder.error("ERR wrong number of arguments for 'TTL'");
         }
-        String key = command.args().get(0);
+        String key = command.args().getFirst();
         long ttl = DataStore.getInstance().ttl(key);
         return ttl >= 0 ? RESPEncoder.integer(ttl) : RESPEncoder.nullString();
     }

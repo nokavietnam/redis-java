@@ -114,5 +114,35 @@ public class RESPEncoder {
         // 2. Wrap in RESP Bulk String
         return bulk(sb.toString());
     }
+
+    public static String mapToRESP3(Map<String, Object> map) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("%").append(map.size()).append("\r\n");
+
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            sb.append("+").append(entry.getKey()).append("\r\n"); // key is always a simple string
+
+            Object value = entry.getValue();
+
+            if (value instanceof String) {
+                sb.append("+").append(value).append("\r\n");
+            } else if (value instanceof Integer || value instanceof Long) {
+                sb.append(":").append(value).append("\r\n");
+            } else if (value instanceof List) {
+                List<?> list = (List<?>) value;
+                sb.append("*").append(list.size()).append("\r\n");
+                for (Object item : list) {
+                    sb.append("+").append(item.toString()).append("\r\n"); // simplify: treat all list items as strings
+                }
+            } else if (value == null) {
+                sb.append("_\r\n");
+            } else {
+                // fallback to string
+                sb.append("+").append(value.toString()).append("\r\n");
+            }
+        }
+
+        return sb.toString();
+    }
 }
 

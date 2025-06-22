@@ -5,6 +5,7 @@ import java.util.Map;
 
 public enum CommandType {
     PING,
+    HELLO,
     SET,
     GET,
     DEL,
@@ -22,12 +23,14 @@ public enum CommandType {
     ZRANGE,
     ZSCORE,
     ZREM,
+    COMMAND,
     UNKNOWN;
 
     private static final Map<String, CommandType> lookup = new HashMap<>();
 
     static {
         lookup.put("PING", PING);
+        lookup.put("HELLO", HELLO);
         lookup.put("SET", SET);
         lookup.put("GET", GET);
         lookup.put("DEL", DEL);
@@ -45,6 +48,7 @@ public enum CommandType {
         lookup.put("ZRANGE", ZRANGE);
         lookup.put("ZSCORE", ZSCORE);
         lookup.put("ZREM", ZREM);
+        lookup.put("COMMAND", COMMAND);
     }
 
     public static CommandType fromString(String type) {
