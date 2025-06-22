@@ -26,7 +26,7 @@ public class EventLoop implements Closeable {
     private static final Logger log = LogManager.getLogger(EventLoop.class);
 
     public void start(int port) throws IOException {
-        try (Selector selector = Selector.open(); ServerSocketChannel serverChannel = ServerSocketChannel.open();) {
+        try (Selector selector = Selector.open(); ServerSocketChannel serverChannel = ServerSocketChannel.open()) {
             serverChannel.configureBlocking(false);
             serverChannel.socket().bind(new InetSocketAddress(port));
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
@@ -66,7 +66,7 @@ public class EventLoop implements Closeable {
                             handleWrite(key);
                         } else if (key.isConnectable()) {
                             log.info("Connectable");
-                            handleConnect(key);
+                            handleConnect();
                         }
                     }
                 } catch (final IOException e) {
@@ -76,7 +76,7 @@ public class EventLoop implements Closeable {
         }
     }
 
-    private void handleConnect(SelectionKey key) {
+    private void handleConnect() {
 
     }
 
@@ -115,7 +115,7 @@ public class EventLoop implements Closeable {
             RESP3Parser parser = new RESP3Parser(input);
 
             while (!Thread.currentThread().isInterrupted()) {
-                RedisCommand cmd = null;
+                RedisCommand cmd;
                 try {
                     cmd = parser.parseCommand(); // một lệnh RESP
                     if (cmd == null)
@@ -152,7 +152,7 @@ public class EventLoop implements Closeable {
     }
 
     private static void handleWrite(final SelectionKey key) throws IOException {
-        try (SocketChannel socket = (SocketChannel) key.channel();) {
+        try (SocketChannel socket = (SocketChannel) key.channel()) {
             ByteBuffer byteBuffer = (ByteBuffer) key.attachment();
             socket.write(byteBuffer); // Wont always write everything
             while (!byteBuffer.hasRemaining()) {
@@ -165,16 +165,7 @@ public class EventLoop implements Closeable {
     }
 
     @Override
-    public void close() throws IOException {
-//        if (clientChannel != null) {
-//            clientChannel.close();
-//        }
-//        if (serverChannel != null) {
-//            serverChannel.close();
-//        }
-//        if (selector != null) {
-//            selector.close();
-//        }
+    public void close() {
         SnapshotJob.getInstance().stop();
         ExpiryCleaner.getInstance().stop();
     }
