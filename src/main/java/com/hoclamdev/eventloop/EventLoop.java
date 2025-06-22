@@ -40,33 +40,37 @@ public class EventLoop implements Closeable {
             SnapshotJob.getInstance().start();
             ExpiryCleaner.getInstance().start();
 
-            while (!Thread.currentThread().isInterrupted()) {
-                selector.select();
-                final Set<SelectionKey> keys = selector.selectedKeys();
-                Iterator<SelectionKey> iter = keys.iterator();
-                while (iter.hasNext()) {
-                    //for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
-                    SelectionKey key = iter.next();
-                    iter.remove();
-                    try {
-                        if (key.isValid()) {
-                            if (key.isAcceptable()) {
-                                log.info("Acceptable");
-                                handleAccept(selector, key);
-                            } else if (key.isReadable()) {
-                                log.info("Reading");
-                                handleRead(key);
-                            } else if (key.isWritable()) {
-                                log.info("Writing");
-                                handleWrite(key);
-                            } else if (key.isConnectable()) {
-                                log.info("Connectable");
-                                handleConnect(key);
-                            }
+            handle(selector);
+        }
+    }
+
+    private void handle(Selector selector) throws IOException {
+        while (!Thread.currentThread().isInterrupted()) {
+            selector.select();
+            final Set<SelectionKey> keys = selector.selectedKeys();
+            Iterator<SelectionKey> iter = keys.iterator();
+            while (iter.hasNext()) {
+                //for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
+                SelectionKey key = iter.next();
+                iter.remove();
+                try {
+                    if (key.isValid()) {
+                        if (key.isAcceptable()) {
+                            log.info("Acceptable");
+                            handleAccept(selector, key);
+                        } else if (key.isReadable()) {
+                            log.info("Reading");
+                            handleRead(key);
+                        } else if (key.isWritable()) {
+                            log.info("Writing");
+                            handleWrite(key);
+                        } else if (key.isConnectable()) {
+                            log.info("Connectable");
+                            handleConnect(key);
                         }
-                    } catch (final IOException e) {
-                        throw new UncheckedIOException(e);
                     }
+                } catch (final IOException e) {
+                    throw new UncheckedIOException(e);
                 }
             }
         }
