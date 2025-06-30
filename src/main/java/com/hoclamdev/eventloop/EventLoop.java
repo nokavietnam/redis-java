@@ -91,7 +91,7 @@ public class EventLoop implements Closeable {
     }
 
     private void handleRead(SelectionKey key) {
-        log.info("Read Thread: {}", Thread.currentThread().getName());
+        log.info("Read Thread: {}", Thread.currentThread().threadId());
         SocketChannel channel = (SocketChannel) key.channel();
         ByteBuffer buffer = (ByteBuffer) key.attachment();
 

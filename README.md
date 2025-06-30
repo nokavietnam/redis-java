@@ -46,6 +46,13 @@ get x
 del x
 ```
 
+## Stress testing 
+
+```shell
+for i in {1..100}; do redis-cli -h <host> -p <port> set key$i "value$i"; done
+```
+
+
 ## RESP3
 
 | RESP3                   | Supported |
