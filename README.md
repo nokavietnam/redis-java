@@ -52,6 +52,19 @@ del x
 for i in {1..100}; do redis-cli -h <host> -p <port> set key$i "value$i"; done
 ```
 
+## Benchmark 
+
+```shell
+redis-benchmark  -h <host> -p <port> -t set -n 100000 -c 200
+
+redis-benchmark -h <host> -p <port> -a "<password>" -t set -n 100000 -c 200
+
+
+redis-benchmark  -h 10.168.7.108 -p 6379 -t get -n 1000000 -c 200
+
+redis-benchmark -h <host> -p <port> -a "<password>" -t get -n 1000000 -c 200
+```
+
 
 ## RESP3
 

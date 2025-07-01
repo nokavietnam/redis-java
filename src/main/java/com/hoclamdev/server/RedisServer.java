@@ -1,9 +1,8 @@
 package com.hoclamdev.server;
 
 import com.hoclamdev.config.ConfigLoader;
-import com.hoclamdev.job.ExpiryCleaner;
+import com.hoclamdev.eventloop.MultiCoreEventLoop;
 import com.hoclamdev.eventloop.EventLoop;
-import com.hoclamdev.job.SnapshotJob;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -14,7 +13,8 @@ public class RedisServer {
 
     public static void main(String[] args) {
         int port = ConfigLoader.getInt("server.port", 6379);
-        try (EventLoop eventLoop = new EventLoop()) {
+//        try (EventLoop eventLoop = new EventLoop()) {
+        try (MultiCoreEventLoop eventLoop = new MultiCoreEventLoop()) {
             eventLoop.start(port);
         } catch (IOException ex) {
             log.error("Failed start server: ", ex);

@@ -2,6 +2,7 @@ package com.hoclamdev.store;
 
 import com.hoclamdev.config.ConfigLoader;
 import com.hoclamdev.os.MemoryMonitor;
+import com.hoclamdev.segment.SegmentedConcurrentLRUMap;
 import com.hoclamdev.store.datatype.RedisDataType;
 import com.hoclamdev.store.datatype.impl.RedisHash;
 import com.hoclamdev.store.datatype.impl.RedisList;
@@ -22,7 +23,8 @@ public class DataStore {
     private static final long MAX_MEMORY_LIMIT = ConfigLoader.getInt("max.memory.size", 1024) * 1024L * 1024L;
 
     // wrap LRUCache Collections.synchronizedMap to make thread safe
-    private static final Map<String, RedisDataType> store = Collections.synchronizedMap(new LRUCacheMap<>(MAX_KEYS, MAX_MEMORY_LIMIT));
+//    private static final Map<String, RedisDataType> store = Collections.synchronizedMap(new LRUCacheMap<>(MAX_KEYS, MAX_MEMORY_LIMIT));
+    private static final SegmentedConcurrentLRUMap<String, RedisDataType> store = new SegmentedConcurrentLRUMap<>(100, 1000);
 
 
     private DataStore() {}
@@ -35,8 +37,12 @@ public class DataStore {
         return Holder.INSTANCE;
     }
 
+//    public synchronized Map<String, RedisDataType> getSnapshot() {
+//        return new HashMap<>(store);
+//    }
+
     public synchronized Map<String, RedisDataType> getSnapshot() {
-        return new HashMap<>(store);
+        return store.toMap();
     }
 
     public synchronized void loadSnapshot(Map<String, RedisDataType> snapshot) {
