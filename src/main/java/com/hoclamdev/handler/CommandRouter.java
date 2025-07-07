@@ -58,20 +58,8 @@ public class CommandRouter {
             // ZSET
             case ZADD -> handleZAdd(command, mode);
             case ZRANGE -> handleZRange(command);
-//            case ZSCORE -> handleZScore(command);
+            case ZSCORE -> handleZScore(command);
             case ZREM -> handleZRem(command);
-//            case "ZADD":
-//                DataStore.zadd(args[1], Double.parseDouble(args[2]), args[3]);
-//                return "OK";
-//            case "ZRANGE":
-//                return DataStore.zrange(args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]));
-//            case "ZSCORE":
-//                Double score = DataStore.zscore(args[1], args[2]);
-//                return score != null ? score.toString() : null;
-//            case "ZREM":
-//                return DataStore.zrem(args[1], args[2]) ? 1 : 0;
-
-//            case COMMAND -> handleCommand();
             default -> RESPEncoder.error("ERR unknown command");
         };
     }
@@ -84,9 +72,13 @@ public class CommandRouter {
         return RESPEncoder.integer(data ? 1 : 0);
     }
 
-//    private String handleZScore(RedisCommand command) {
-//        DataStore.getInstance()
-//    }
+    private String handleZScore(RedisCommand command) {
+        if (command.args().size() < 2) {
+            return RESPEncoder.error("ERR wrong number of arguments for 'ZScore'");
+        }
+        Double data = DataStore.getInstance().zscore(command.args().get(0), command.args().get(1));
+        return data == null ? RESPEncoder.nullString() : RESPEncoder.doubleValue(data);
+    }
 
     private String handleZRange(RedisCommand command) {
         if (command.args().size() < 3) {
@@ -101,6 +93,9 @@ public class CommandRouter {
     private String handleZAdd(RedisCommand command, SnapshotType mode) {
         if (command.args().size() < 3) {
             return RESPEncoder.error("ERR wrong number of arguments for 'ZAdd'");
+        }
+        if (SnapshotType.AOF.equals(mode)) {
+            AOFLogger.logCommand(command.toCommandString());
         }
         DataStore.getInstance().zadd(command.args().get(0), Double.parseDouble(command.args().get(1)), command.args().get(2));
         return RESPEncoder.simple("OK");
@@ -123,53 +118,6 @@ public class CommandRouter {
         }
         String data = DataStore.getInstance().hget(command.args().get(0), command.args().get(1));
         return data == null ? RESPEncoder.nullString() : RESPEncoder.bulk(data);
-    }
-
-    private String handleCommand() {
-        Map<String, Object> commandMap = new LinkedHashMap<>();
-
-        Map<String, Object> setCommand = new LinkedHashMap<>();
-        setCommand.put("arity", 3);
-        setCommand.put("flags", List.of("write", "denyoom"));
-        setCommand.put("first-key", 1);
-        setCommand.put("last-key", 1);
-        setCommand.put("step", 1);
-        setCommand.put("acl-categories", List.of("@write", "@keyspace"));
-        setCommand.put("tips", List.of());
-
-        Map<String, Object> keySpec = new LinkedHashMap<>();
-        keySpec.put("flags", List.of("write"));
-
-// begin-search
-        Map<String, Object> beginSearch = new LinkedHashMap<>();
-        beginSearch.put("type", "index");
-        keySpec.put("begin-search", beginSearch);
-
-// spec
-        Map<String, Object> spec = new LinkedHashMap<>();
-        spec.put("index", 1);
-        spec.put("flags", List.of());
-        keySpec.put("spec", spec);
-
-// find-key
-        Map<String, Object> findKey = new LinkedHashMap<>();
-        findKey.put("type", "range");
-
-        Map<String, Object> rangeSpec = new LinkedHashMap<>();
-        rangeSpec.put("start", 1);
-        rangeSpec.put("end", 1);
-        rangeSpec.put("flags", List.of());
-
-        findKey.put("range-spec", rangeSpec);
-        keySpec.put("find-key", findKey);
-
-        setCommand.put("key-specs", List.of(keySpec));
-        setCommand.put("subcommands", List.of());
-        setCommand.put("engine", null);
-
-        commandMap.put("set", setCommand);
-
-        return RESPEncoder.mapToRESP3(commandMap);
     }
 
     private String handleHello(RedisCommand command) {
@@ -246,8 +194,7 @@ public class CommandRouter {
     }
 
     private String handlePing(RedisCommand command) {
-        String msg = !command.args().isEmpty() ? command.args().getFirst() : "PONG";
-        //return RESPEncoder.verbatim("txt", msg);
+        String msg = !command.args().isEmpty() ? command.args() .getFirst() : "PONG";
         return RESPEncoder.simple(msg);
     }
 
