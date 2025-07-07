@@ -1,22 +1,18 @@
 package com.hoclamdev.snapshot.data;
 
+import com.hoclamdev.store.datatype.RedisDataType;
+
 import java.io.Serializable;
 import java.util.Map;
 
 public class SnapshotData implements Serializable {
-    private final Map<String, String> store;
-    private final Map<String, Long> ttlMap;
+    private final Map<String, RedisDataType> store;
 
-    public SnapshotData(Map<String, String> store, Map<String, Long> ttlMap) {
+    public SnapshotData(Map<String, RedisDataType> store) {
         this.store = store;
-        this.ttlMap = ttlMap;
     }
 
-    public Map<String, String> getStore() {
+    public Map<String, RedisDataType> getStore() {
         return store;
-    }
-
-    public Map<String, Long> getTtlMap() {
-        return ttlMap;
     }
 }
