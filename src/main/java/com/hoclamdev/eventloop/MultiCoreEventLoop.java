@@ -41,7 +41,7 @@ public class MultiCoreEventLoop implements Closeable {
             SnapshotJob.getInstance().start();
             ExpiryCleaner.getInstance().start();
 
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
                 acceptorSelector.select();
                 Set<SelectionKey> keys = acceptorSelector.selectedKeys();
                 Iterator<SelectionKey> iter = keys.iterator();

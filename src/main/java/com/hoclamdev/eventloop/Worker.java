@@ -24,7 +24,7 @@ class Worker extends Thread {
     private static final Logger log = LogManager.getLogger(Worker.class);
     private final Selector selector;
     private final Queue<SocketChannel> newConnections = new ConcurrentLinkedQueue<>();
-    private final ByteBuffer buffer = ByteBuffer.allocate(4096);
+//    private final ByteBuffer buffer = ByteBuffer.allocate(4096);
     private volatile boolean running = true;
 
     public Worker(String name) throws IOException {

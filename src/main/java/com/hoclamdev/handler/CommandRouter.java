@@ -53,12 +53,13 @@ public class CommandRouter {
             case SISMEMBER -> handleSIsMember(command);
             // HASH
             case HSET -> handleHSet(command, mode);
-//            case "HGET":
-//                return DataStore.hget(args[1], args[2]);
-//            case "HDEL":
-//                return DataStore.hdel(args[1], args[2]) ? 1 : 0;
-//
-//            // ZSET
+            case HGET -> handleHGet(command);
+            case HDEL -> handleHDelete(command, mode);
+            // ZSET
+            case ZADD -> handleZAdd(command, mode);
+            case ZRANGE -> handleZRange(command);
+//            case ZSCORE -> handleZScore(command);
+            case ZREM -> handleZRem(command);
 //            case "ZADD":
 //                DataStore.zadd(args[1], Double.parseDouble(args[2]), args[3]);
 //                return "OK";
@@ -73,6 +74,55 @@ public class CommandRouter {
 //            case COMMAND -> handleCommand();
             default -> RESPEncoder.error("ERR unknown command");
         };
+    }
+
+    private String handleZRem(RedisCommand command) {
+        if (command.args().size() < 3) {
+            return RESPEncoder.error("ERR wrong number of arguments for 'ZRem'");
+        }
+        boolean data = DataStore.getInstance().zrem(command.args().get(0), command.args().get(1));
+        return RESPEncoder.integer(data ? 1 : 0);
+    }
+
+//    private String handleZScore(RedisCommand command) {
+//        DataStore.getInstance()
+//    }
+
+    private String handleZRange(RedisCommand command) {
+        if (command.args().size() < 3) {
+            return RESPEncoder.error("ERR wrong number of arguments for 'ZRange'");
+        }
+        List<String> data = DataStore.getInstance().zrange(command.args().get(0),
+                        Integer.parseInt(command.args().get(1)),
+                        Integer.parseInt(command.args().get(2)));
+        return RESPEncoder.array(data);
+    }
+
+    private String handleZAdd(RedisCommand command, SnapshotType mode) {
+        if (command.args().size() < 3) {
+            return RESPEncoder.error("ERR wrong number of arguments for 'ZAdd'");
+        }
+        DataStore.getInstance().zadd(command.args().get(0), Double.parseDouble(command.args().get(1)), command.args().get(2));
+        return RESPEncoder.simple("OK");
+    }
+
+    private String handleHDelete(RedisCommand command, SnapshotType mode) {
+        if (command.args().size() < 2) {
+            return RESPEncoder.error("ERR wrong number of arguments for 'HDelete'");
+        }
+        if (SnapshotType.AOF.equals(mode)) {
+            AOFLogger.logCommand(command.toCommandString());
+        }
+        boolean data = DataStore.getInstance().hdel(command.args().get(0), command.args().get(1));
+        return RESPEncoder.integer(data ? 1 : 0);
+    }
+
+    private String handleHGet(RedisCommand command) {
+        if (command.args().size() < 2) {
+            return RESPEncoder.error("ERR wrong number of arguments for 'HGet'");
+        }
+        String data = DataStore.getInstance().hget(command.args().get(0), command.args().get(1));
+        return data == null ? RESPEncoder.nullString() : RESPEncoder.bulk(data);
     }
 
     private String handleCommand() {
@@ -127,7 +177,6 @@ public class CommandRouter {
             String username = command.args().get(2);
             String password = command.args().get(3);
             log.info("Authenticating user '{}' with password '{}'", username, password);
-            // TODO: implement auth
         }
 
         Map<String, Object> helloMap = new LinkedHashMap<>();
@@ -272,6 +321,4 @@ public class CommandRouter {
         Map<String, String> info = DataStore.getInstance().getInfo();
         return RESPEncoder.convertInfoMapToResp("SERVER", info);
     }
-
-
 }

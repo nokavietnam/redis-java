@@ -64,9 +64,6 @@ public class EventLoop implements Closeable {
                         } else if (key.isWritable()) {
                             log.info("Writing");
                             handleWrite(key);
-                        } else if (key.isConnectable()) {
-                            log.info("Connectable");
-                            handleConnect();
                         }
                     }
                 } catch (final IOException e) {
@@ -74,10 +71,6 @@ public class EventLoop implements Closeable {
                 }
             }
         }
-    }
-
-    private void handleConnect() {
-
     }
 
     private void handleAccept(Selector selector, SelectionKey key) throws IOException {

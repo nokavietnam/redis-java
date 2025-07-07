@@ -1,5 +1,25 @@
 # redis-java
 
+
+
+## Flow chart
+
+```mermaid
+flowchart TD
+    Client((Client command\nGET, SET, ..)) -- TCP 6379 --> Server[Redis Server]
+    Server <--> EventLoop[Event Loop]
+    EventLoop <--> Router((Router))
+    Router --> |Parse RESP \n and routing| Process[Process Command]
+    Process <--> DataStore[Data Store]
+    Process --> |Parse response \n to RESP| Router
+    Server --> Client
+    
+    Process -- AOF: yes \n save command to file --> File[File]
+    CronJob((Cron Job)) -- RDB: yes \n save data --> Snapshot[Snapshot]
+    CronJob -- clear key expired --> DataStore
+    
+```
+
 ## List feature
 
 | Feature              | Supported |
@@ -60,10 +80,33 @@ redis-benchmark  -h <host> -p <port> -t set -n 100000 -c 200
 redis-benchmark -h <host> -p <port> -a "<password>" -t set -n 100000 -c 200
 
 
-redis-benchmark  -h 10.168.7.108 -p 6379 -t get -n 1000000 -c 200
+redis-benchmark  -h <host> -p 6379 -t get -n 1000000 -c 200
 
 redis-benchmark -h <host> -p <port> -a "<password>" -t get -n 1000000 -c 200
 ```
+
+Redis-Java
+
+
+
+---
+Ten thousand keys
+
+Redis
+![Redis 10k keys](./images/redis-10k-keys.png)
+
+Redis Java
+![Redis Java 10k keys](./images/redis-java-10k-keys.png)
+
+----
+- One million keys
+
+Redis 
+![Redis 1M keys](./images/redis-1M-keys.png)
+
+Redis Java
+![Redis Java 10k keys](./images/redis-java-1M-keys.png)
+---
 
 
 ## RESP3
@@ -74,3 +117,10 @@ redis-benchmark -h <host> -p <port> -a "<password>" -t get -n 1000000 -c 200
 | Integer, Double, BigInt | ✅         |
 | Null, Boolean           | ✅         |
 | Array, Map, Attributes  | ✅         |
+
+
+## TODO
+
+- Authentication
+- Pub/Sub
+
