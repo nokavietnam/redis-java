@@ -133,6 +133,12 @@ public class DataStore {
         return data instanceof RedisZSet redisZSet && redisZSet.zrem(member);
     }
 
+    public Double zscore(String key, String member) {
+        if (isExpired(key)) return null;
+        RedisDataType data = store.get(key);
+        return data instanceof RedisZSet redisZSet ? redisZSet.zscore(member) : null;
+    }
+
 
     public boolean del(String key) {
         return store.remove(key) != null;
